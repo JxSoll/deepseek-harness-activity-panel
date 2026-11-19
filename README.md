@@ -1,44 +1,75 @@
 # DSH — вспомогательное окно агента
 
-Плагин для DeepSeek Harness: небольшое полупрозрачное окно поверх всех окон,
-которое показывает, что агент делает прямо сейчас.
+Плагин для [DeepSeek Harness](https://github.com/deepseek-ai): небольшое
+полупрозрачное окно поверх всех окон, которое показывает, что агент делает
+прямо сейчас.
+
+![Окно](https://raw.githubusercontent.com/JxSoll/deepseek-harness-activity-panel/main/docs/preview.png)
 
 ## Что показывает
 
-- текущий ответ (markdown: заголовки, таблицы, списки, блоки кода, инлайн-код);
+- текущий ответ с оформлением как в чате: заголовки, таблицы, списки,
+  блоки кода и инлайн-код плашками;
 - строку «Глубокое размышление… N с», пока идёт рассуждение;
-- таймер работы;
+- таймер текущего хода;
 - прошлый ответ, пока новый ещё не начался.
 
 ## Поведение
 
-- окно прижато к правому нижнему углу, растёт вверх по мере текста;
+- правый нижний угол, растёт вверх по мере текста;
 - не поднимается выше окна DSH и не заходит на панель задач;
-- клики проходят сквозь него;
-- после завершения работы остаётся на 60 секунд и плавно уезжает вниз;
+- клики проходят сквозь окно;
+- через 30 секунд после завершения работы плавно уезжает вниз;
 - закрыть принудительно — `Ctrl+Alt+X`.
 
 ## Установка
 
-```
-plugin/         — сам плагин DSH (bundle)
-activity-rs/    — исходник окна на Rust (eframe/egui)
-```
+### Вариант 1 — готовый exe (ничего собирать не нужно)
 
-1. Скопируйте `plugin/` в рабочую папку.
-2. Соберите окно:
+1. Скачайте `ActivityWindow.exe` из
+   [последнего релиза](https://github.com/JxSoll/deepseek-harness-activity-panel/releases/latest).
+2. Скачайте папку `plugin/` из репозитория.
+3. Положите exe в `plugin/viewer/ActivityWindow.exe`.
+4. В DSH: **Плагины → Add plugin** → укажите папку `plugin`.
+
+Требования: Windows 10/11 и DSH Desktop. **Rust и .NET не нужны** — exe
+собран статически, зависимостей нет.
+
+### Вариант 2 — собрать окно самому
+
+Нужны Rust и MinGW-w64 (toolchain `x86_64-pc-windows-gnu`):
 
 ```powershell
 cargo build --release --manifest-path activity-rs/Cargo.toml
+copy target\release\activity-window.exe plugin\viewer\ActivityWindow.exe
 ```
 
-3. Положите готовый exe в `plugin/viewer/ActivityWindow.exe`.
-4. Установите bundle через Plugin Manager (Add plugin → локальная папка).
+Статическая сборка без внешних DLL:
 
-## Требования
+```powershell
+$env:RUSTFLAGS = "-C target-feature=+crt-static"
+cargo build --release --manifest-path activity-rs/Cargo.toml
+```
 
-- Windows 10/11, Rust с toolchain `x86_64-pc-windows-gnu` и MinGW-w64.
-- DSH Desktop.
+## Структура
+
+```
+plugin/       — плагин DSH (bundle): манифест, патч, index.js, локали, иконка
+activity-rs/  — исходник окна: Rust + eframe/egui
+```
+
+## Настройка
+
+В `plugin/cordis.patch.yml` профиля можно отключить автозапуск окна:
+
+```yaml
+- id: dsh-activity
+  name: '@local/dsh-activity-panel'
+  config:
+    showViewer: false
+```
+
+Состояние пишется в `%USERPROFILE%\.dsh\activity\state.json`.
 
 ## Лицензия
 
