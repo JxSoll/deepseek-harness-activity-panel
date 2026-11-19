@@ -24,32 +24,16 @@
 
 ## Установка
 
-### Вариант 1 — готовый exe (ничего собирать не нужно)
-
 1. Скачайте `ActivityWindow.exe` из
    [последнего релиза](https://github.com/JxSoll/deepseek-harness-activity-panel/releases/latest).
 2. Скачайте папку `plugin/` из репозитория.
 3. Положите exe в `plugin/viewer/ActivityWindow.exe`.
 4. В DSH: **Плагины → Add plugin** → укажите папку `plugin`.
 
-Требования: Windows 10/11 и DSH Desktop. **Rust и .NET не нужны** — exe
-собран статически, зависимостей нет.
+Готово — окно запустится само и появится, как только агент начнёт отвечать.
 
-### Вариант 2 — собрать окно самому
-
-Нужны Rust и MinGW-w64 (toolchain `x86_64-pc-windows-gnu`):
-
-```powershell
-cargo build --release --manifest-path activity-rs/Cargo.toml
-copy target\release\activity-window.exe plugin\viewer\ActivityWindow.exe
-```
-
-Статическая сборка без внешних DLL:
-
-```powershell
-$env:RUSTFLAGS = "-C target-feature=+crt-static"
-cargo build --release --manifest-path activity-rs/Cargo.toml
-```
+**Требования:** Windows 10/11 и DSH Desktop. Rust, .NET и MinGW **не нужны**:
+exe собран статически, внешних зависимостей нет.
 
 ## Структура
 
