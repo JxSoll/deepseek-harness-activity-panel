@@ -33,23 +33,31 @@ export function apply(ctx, config = {}) {
   let stepSince = Date.now();
   let streaming = false;
   let toolsRunning = 0;
+  let lastEvent = Date.now();
   let viewer = null;
   let viewerStarted = false;
 
-  const active = () => streaming || toolsRunning > 0;
+  const active = () => {
+  // A missing tools/result (error, cancel) used to leave the counter stuck.
+  if (toolsRunning > 0 && Date.now() - lastEvent > 20000) toolsRunning = 0;
+  if (streaming && Date.now() - lastEvent > 120000) streaming = false;
+  return streaming || toolsRunning > 0;
+};
 
   const write = () => {
     const payload = JSON.stringify({
       ts: Date.now(),
       since: stepSince,
       active: active(),
-      title: active() ? 'DSH · работаю' : 'DSH · свободен',
-      answer: tail(answer, ANSWER_TAIL).length > 0
+      title: active() ? 'DeepSeek HARNESS · работаю' : 'DeepSeek HARNESS',
+      answer: !active() ? '' : tail(answer, ANSWER_TAIL).length > 0
         ? tail(answer, ANSWER_TAIL)
-        : (thinking.trim().length > 0
-            ? `Глубокое размышление… ${Math.max(1, Math.round((Date.now() - stepSince) / 1000))} с`
+        : (active()
+            ? (thinking.trim().length > 0
+                ? `Глубокое размышление… ${Math.max(1, Math.round((Date.now() - stepSince) / 1000))} с`
+                : `Работаю… ${Math.max(1, Math.round((Date.now() - stepSince) / 1000))} с`)
             : ''),
-      previous,
+      previous: '',
     });
     try {
       const temp = statePath + '.tmp';
@@ -60,25 +68,33 @@ export function apply(ctx, config = {}) {
     }
   };
 
+  let killed = false;
   const ensureViewer = () => {
-    if (viewerStarted || config.showViewer === false) return;
-    viewerStarted = true;
+    if (config.showViewer === false) return;
+    if (viewer !== null && viewer.exitCode === null) return;
     if (!fs.existsSync(viewerPath)) return;
-    // A reload leaves the previous process behind: clear it, then start one.
-    execFile('taskkill', ['/IM', 'ActivityWindow.exe', '/F'], { windowsHide: true }, () => {
+    const launch = () => {
       try {
-        viewer = spawn(viewerPath, [statePath], { detached: true, stdio: 'ignore' });
-        viewer.on('exit', () => { viewer = null; });
+        viewer = spawn(viewerPath, [statePath], { detached: true, stdio: "ignore" });
+        viewer.on("exit", () => { viewer = null; });
         viewer.unref();
       } catch {
-        // The viewer can be started by hand; the state file still works.
+        // the state file still works without the window
       }
-    });
+    };
+    if (!killed) {
+      // clear a stale copy left over from a previous plugin load
+      killed = true;
+      execFile("taskkill", ["/IM", "ActivityWindow.exe", "/F"], { windowsHide: true }, launch);
+    } else {
+      launch();
+    }
   };
 
   write();
   ensureViewer();
 
+  lastEvent = Date.now();
   ctx.on('agent/assistant-stream', (payload) => {
     try {
       const frame = payload?.frame;
@@ -89,6 +105,7 @@ export function apply(ctx, config = {}) {
         thinking = '';
         stepSince = Date.now();
         streaming = true;
+        ensureViewer();
         write();
         return;
       }
@@ -116,6 +133,7 @@ export function apply(ctx, config = {}) {
     }
   });
 
+  lastEvent = Date.now();
   ctx.on('tools/pre-execute', (exec, next) => {
     try {
       toolsRunning += 1;
@@ -127,6 +145,7 @@ export function apply(ctx, config = {}) {
     return next();
   });
 
+  lastEvent = Date.now();
   ctx.on('tools/result', () => {
     try {
       toolsRunning = Math.max(0, toolsRunning - 1);
@@ -136,6 +155,7 @@ export function apply(ctx, config = {}) {
     }
   });
 
+  lastEvent = Date.now();
   ctx.on('turn/end', () => {
     try {
       streaming = false;
