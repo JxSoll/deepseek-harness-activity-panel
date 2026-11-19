@@ -1,0 +1,23 @@
+{
+  "name": "@local/dsh-activity",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shows the agent's current action in a small always-on-top window.",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "viewer/ActivityWindow.exe"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" }
+  }
+}
