@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Activity window">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1b2430"/>
+  <rect x="14" y="16" width="36" height="24" rx="4" fill="none" stroke="#4f9cf0" stroke-width="3"/>
+  <path d="M14 46h20" stroke="#7ee0c0" stroke-width="3" stroke-linecap="round"/>
+  <path d="M40 46h10" stroke="#7ee0c0" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="22" cy="28" r="3" fill="#7ee0c0"/>
+</svg>
