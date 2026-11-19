@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Agent activity window",
+    "description": "Writes what the agent is doing right now to a state file and keeps a small always-on-top window showing the current tool call, so long runs stay visible outside the chat.",
+    "detail": "docs/DETAIL.md"
+  }
+}
