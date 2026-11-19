@@ -25,7 +25,7 @@ const PAD_X: f32 = 14.0;
 const PAD_Y: f32 = 10.0;
 const GAP: f32 = 6.0;
 const POLL: Duration = Duration::from_millis(16);
-const READ_GRACE: Duration = Duration::from_secs(30);
+const READ_GRACE: Duration = Duration::from_secs(90);
 const STALE: Duration = Duration::from_secs(3);
 const CORNER: u8 = 14;
 const BOTTOM_GAP: f32 = 8.0;
@@ -316,6 +316,7 @@ struct App {
     seen: Instant,
     height: f32,
     alpha: f32,
+    icon: Option<egui::TextureHandle>,
     last_size: egui::Vec2,
     last_pos: egui::Pos2,
 }
@@ -332,6 +333,7 @@ impl App {
             seen: Instant::now() - Duration::from_secs(60),
             height: MIN_HEIGHT,
             alpha: 0.0,
+            icon: None,
             last_size: egui::vec2(0.0, 0.0),
             last_pos: egui::pos2(0.0, 0.0),
         }
@@ -490,6 +492,14 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
+        if self.icon.is_none() {
+            if let Ok(img) = image::load_from_memory(include_bytes!("../../assets/whale.png")) {
+                let rgba = img.to_rgba8();
+                let (w, h) = rgba.dimensions();
+                let ci = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], rgba.as_raw());
+                self.icon = Some(ctx.load_texture("whale", ci, egui::TextureOptions::LINEAR));
+            }
+        }
         if !self.passthrough_done {
             ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(true));
             self.passthrough_done = true;
@@ -512,7 +522,8 @@ impl eframe::App for App {
             self.state.previous.clone()
         };
         let body_is_previous = self.state.answer.is_empty();
-        let show = !body.is_empty() && !idle;
+        let fresh = self.seen.elapsed() < Duration::from_secs(45);
+        let show = !body.is_empty() && fresh && !idle;
 
         // The window stays mapped: fading and sliding look smooth, showing
         // and hiding a native window does not animate at all.
@@ -520,6 +531,17 @@ impl eframe::App for App {
         self.alpha += (target_alpha - self.alpha) * FADE_STEP;
         if (target_alpha - self.alpha).abs() < 0.01 {
             self.alpha = target_alpha;
+        }
+        // Nothing to show: collapse and paint nothing, so no old text lingers.
+        if !show {
+            // Closing: fade out and slide down, then unmap.
+            self.alpha = (self.alpha - FADE_STEP).max(0.0);
+            if self.alpha <= 0.02 {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                self.visible = false;
+                self.height = MIN_HEIGHT;
+                return;
+            }
         }
         if !self.visible {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
@@ -533,7 +555,8 @@ impl eframe::App for App {
         let clock = painter.layout(self.clock(), egui::FontId::proportional(SMALL), OK, wrap);
         let blocks = self.parse(&painter, &body, body_is_previous);
 
-        let mut target = PAD_Y * 2.0 + header.size().y.max(clock.size().y) + GAP;
+        let head_h = header.size().y.max(clock.size().y).max(18.0);
+        let mut target = PAD_Y * 2.0 + head_h + GAP;
         if body_is_previous {
             target += SMALL + 2.0;
         }
@@ -573,17 +596,31 @@ impl eframe::App for App {
             .show(ui, |ui| {
                 let rect = ui.max_rect();
                 let painter = ui.painter();
-                painter.rect_filled(rect, egui::CornerRadius::same(CORNER), bg);
 
                 let mut y = rect.top() + PAD_Y;
                 let left = rect.left() + PAD_X;
-                painter.galley(egui::pos2(left, y), header.clone(), DIM);
+                let mut text_x = left;
+                if let Some(icon) = &self.icon {
+                    let s = 16.0;
+                    let r = egui::Rect::from_min_size(egui::pos2(left, y + 1.0), egui::vec2(s, s));
+                    painter.image(icon.id(), r, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
+                    text_x += s + 6.0;
+                }
+                let word = painter.layout("deepseek".to_owned(), egui::FontId::proportional(12.5), TEXT, 200.0);
+                painter.galley(egui::pos2(text_x, y), word.clone(), TEXT);
+                text_x += word.size().x + 6.0;
+                let badge = painter.layout("HARNESS".to_owned(), egui::FontId::proportional(8.5), DIM, 100.0);
+                let bw = badge.size().x + 8.0;
+                let bh = badge.size().y + 2.0;
+                let r = egui::Rect::from_min_size(egui::pos2(text_x, y + 1.0), egui::vec2(bw, bh));
+                painter.rect_stroke(r, egui::CornerRadius::same(3), egui::Stroke::new(1.0, DIM), egui::StrokeKind::Inside);
+                painter.galley(egui::pos2(text_x + 4.0, y + 2.0), badge, DIM);
                 painter.galley(
                     egui::pos2(rect.right() - PAD_X - clock.size().x, y + (header.size().y - clock.size().y).max(0.0)),
                     clock.clone(),
                     OK,
                 );
-                y += header.size().y.max(clock.size().y) + GAP;
+                y += header.size().y.max(clock.size().y).max(18.0) + GAP;
 
                 if body_is_previous {
                     painter.text(
