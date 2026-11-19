@@ -34,6 +34,7 @@ export function apply(ctx, config = {}) {
   let streaming = false;
   let toolsRunning = 0;
   let lastEvent = Date.now();
+  let inTurn = false;
   let viewer = null;
   let viewerStarted = false;
 
@@ -41,7 +42,7 @@ export function apply(ctx, config = {}) {
   // A missing tools/result (error, cancel) used to leave the counter stuck.
   if (toolsRunning > 0 && Date.now() - lastEvent > 20000) toolsRunning = 0;
   if (streaming && Date.now() - lastEvent > 120000) streaming = false;
-  return streaming || toolsRunning > 0;
+  return inTurn || streaming || toolsRunning > 0;
 };
 
   const write = () => {
@@ -120,6 +121,7 @@ export function apply(ctx, config = {}) {
           return;
         }
         streaming = true;
+        inTurn = true;
         write();
         return;
       }
@@ -137,6 +139,7 @@ export function apply(ctx, config = {}) {
   ctx.on('tools/pre-execute', (exec, next) => {
     try {
       toolsRunning += 1;
+      inTurn = true;
       ensureViewer();
       write();
     } catch {
@@ -160,6 +163,7 @@ export function apply(ctx, config = {}) {
     try {
       streaming = false;
       toolsRunning = 0;
+      inTurn = false;
       write();
     } catch {
       // ignore
